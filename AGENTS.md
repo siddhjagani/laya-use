@@ -14,3 +14,4 @@ Read README.md before editing. Keep the loop small: page -> indexed elements -> 
 - Do not commit or push unless the user requests it.
 
 Checks: uv run ruff check ., uv run pytest, node --check jev_ultrafast/static/app.js, uv build.
+Browser (browser/): npm run check, npm test. Do not grant tabs Node access or permissions; keep model and page text out of innerHTML.

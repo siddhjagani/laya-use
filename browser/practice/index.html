@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Practice shop · Jev Browser</title>
+  <style>
+    :root { --ink: #1f2522; --muted: #6a716d; --line: #dfe1db; --accent: #2f5d46; --bg: #fbfbf8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.5 system-ui, -apple-system, sans-serif; color: var(--ink); background: var(--bg); }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 16px 28px; border-bottom: 1px solid var(--line); }
+    header b { font-size: 19px; }
+    main { max-width: 860px; margin: 0 auto; padding: 22px 28px 60px; }
+    .note { background: #eef4ef; border: 1px solid #cfe0d4; padding: 10px 14px; border-radius: 10px; margin-bottom: 18px; }
+    form { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+    input[type=search], select { font: inherit; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+    input[type=search] { flex: 1; min-width: 200px; }
+    button { font: inherit; font-weight: 600; padding: 9px 16px; border-radius: 9px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+    button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+    .card { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: #fff; }
+    .card h3 { margin: 0 0 4px; font-size: 16px; }
+    .meta { color: var(--muted); font-size: 13px; }
+    .price { font-weight: 700; margin: 8px 0; }
+    .status { margin: 10px 0 14px; color: var(--muted); }
+    .done { background: #e7f3ea; border: 1px solid var(--accent); padding: 14px; border-radius: 10px; }
+  </style>
+</head>
+<body>
+  <header><b>Fieldnote Supply</b><span class="meta">Practice shop · nothing here is real or charged</span></header>
+  <main id="app"></main>
+  <script>
+    const products = [
+      { id: "trail-notebook", name: "Trail Notebook", category: "Notebooks", price: 14, stock: true },
+      { id: "pocket-notebook", name: "Pocket Notebook", category: "Notebooks", price: 9, stock: false },
+      { id: "brass-pen", name: "Brass Pen", category: "Pens", price: 32, stock: true },
+      { id: "felt-pen", name: "Felt Pen Set", category: "Pens", price: 12, stock: true },
+      { id: "canvas-pouch", name: "Canvas Pouch", category: "Bags", price: 22, stock: false },
+    ];
+    const app = document.getElementById("app");
+    const state = { query: "", category: "All", stock: false, searched: false };
+
+    function list() {
+      const shown = !state.searched ? products : products.filter((p) =>
+        (!state.query || p.name.toLowerCase().includes(state.query.toLowerCase())) &&
+        (state.category === "All" || p.category === state.category) && (!state.stock || p.stock));
+      document.title = "Practice shop · Jev Browser";
+      app.innerHTML = `
+        <div class="note">Try the agent: open the agent panel and ask it to <b>find an in-stock notebook and
+          order it</b>. It will ask before placing the order.</div>
+        <form id="search">
+          <input type="search" id="q" aria-label="Search products" placeholder="Search products" value="${state.query}">
+          <select id="category" aria-label="Category">
+            ${["All", "Notebooks", "Pens", "Bags"].map((c) => `<option ${c === state.category ? "selected" : ""}>${c}</option>`).join("")}
+          </select>
+          <label><input type="checkbox" id="stock" ${state.stock ? "checked" : ""}> In stock only</label>
+          <button type="submit">Search</button>
+        </form>
+        <div class="status">${state.searched ? `${shown.length} results` : `${products.length} products`}</div>
+        <div class="grid">${shown.map((p) => `
+          <div class="card"><h3>${p.name}</h3><div class="meta">${p.category} · ${p.stock ? "In stock" : "Sold out"}</div>
+            <div class="price">$${p.price}</div><button class="ghost" data-open="${p.id}">View ${p.name}</button></div>`).join("")}
+        </div>`;
+      document.getElementById("search").onsubmit = (e) => {
+        e.preventDefault();
+        Object.assign(state, { query: q.value, category: category.value, stock: stock.checked, searched: true });
+        list();
+      };
+      document.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => item(b.dataset.open)));
+    }
+
+    function item(id) {
+      const p = products.find((x) => x.id === id);
+      location.hash = id;
+      app.innerHTML = `<button class="ghost" id="back">← All products</button>
+        <h1>${p.name}</h1><p class="meta">${p.category} · ${p.stock ? "In stock" : "Sold out"}</p>
+        <p class="price">$${p.price}</p>
+        ${p.stock ? `<button id="order">Place order</button>` : `<p>This item is sold out.</p>`}`;
+      document.getElementById("back").onclick = () => { location.hash = ""; list(); };
+      const order = document.getElementById("order");
+      if (order) order.onclick = () => {
+        location.hash = `${id}-ordered`;
+        app.innerHTML = `<div class="done"><h1>Order placed</h1><p>${p.name} · $${p.price}. This was practice:
+          nothing was charged.</p></div>`;
+      };
+    }
+    list();
+  </script>
+</body>
+</html>

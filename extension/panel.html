@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jev</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header>
+    <span class="logo">⚡ Jev</span>
+    <span id="status" class="status">offline</span>
+  </header>
+  <section id="pair" hidden>
+    <p>Start <code>uv run jev-chat</code>, then paste the pairing token it prints.</p>
+    <form id="pair-form">
+      <input id="token" placeholder="Pairing token" autocomplete="off" spellcheck="false">
+      <button type="submit">Pair</button>
+    </form>
+    <p id="pair-error" class="error" hidden></p>
+  </section>
+  <main id="log" aria-live="polite">
+    <div class="msg note">Tell me what to do on the tab you're viewing. I can click, type, choose and scroll, and I only act on things I can see on the page.</div>
+  </main>
+  <form id="ask">
+    <textarea id="goal" rows="2" placeholder="e.g. Find one-way flights from Zurich to London on September 20"
+              required></textarea>
+    <div class="row">
+      <span id="tab" class="tab"></span>
+      <button type="button" id="stop" class="secondary" hidden>Stop</button>
+      <button type="submit" id="send">Send</button>
+    </div>
+  </form>
+  <script src="panel.js"></script>
+</body>
+</html>

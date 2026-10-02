@@ -10,13 +10,15 @@ from .questions import MAX_STEPS
 
 
 class Agent:
-    def __init__(self, url, goals, *, record_dir=None, screenshots=False):
+    def __init__(self, url, goals, *, record_dir=None, screenshots=False, attach=False, confirm=None):
         task = goals.strip() if isinstance(goals, str) else "\n".join(goals).strip()
         if not task:
             raise ValueError("Supply a task")
         plan = [task]
         self.pending_text = None
-        self.browser = Browser(url)
+        # Optional gate: called with an action just before it would execute; False stops the run unexecuted.
+        self.confirm = confirm
+        self.browser = Browser(url, attach=attach)
         self.record_dir = Path(record_dir) if record_dir else None
         self.screenshots = screenshots or bool(record_dir)
         try:
@@ -70,7 +72,7 @@ class Agent:
             if not state["browser"].fresh(state["page"]):
                 state["page"] = state["browser"].observe(screenshot=self.screenshots)
             state["decision"] = None
-            if state["status"] in {"done", "blocked"}:
+            if state["status"] in {"done", "blocked", "stopped"}:
                 raise ValueError("This run has stopped. Start a fresh demo.")
             if len(state["decisions"]) >= MAX_STEPS * 2:
                 raise ValueError("Reached the demo's model-call budget")
@@ -102,6 +104,11 @@ class Agent:
             if len(state["history"]) >= MAX_STEPS:
                 state["status"] = "blocked"
                 raise ValueError(f"Stopped at the {MAX_STEPS}-action demo budget")
+            gate = getattr(self, "confirm", None)
+            if gate and not gate(action):
+                state["status"] = "stopped"
+                state["elapsed_ms"] = round((time.perf_counter() - state["started_at"]) * 1000)
+                return self.snapshot()
             text, helper = None, None
             if action["kind"] == "fill":
                 if not state["browser"].fresh(page):
@@ -161,7 +168,7 @@ class Agent:
         return self.snapshot()
 
     def run(self):
-        while self.state["status"] not in {"done", "blocked"}:
+        while self.state["status"] not in {"done", "blocked", "stopped"}:
             yield self.command("tick")
 
     def close(self):

@@ -67,6 +67,52 @@ Chrome connects through [Browser Harness](https://github.com/browser-use/browser
 
 `TEXT_MODEL_API_KEY` is an OpenRouter key in the example configuration. The current demo uses `inception/mercury-2.5` with reasoning disabled. Gemini, GLM, and DeepSeek can also use the OpenAI-compatible text helper; configure the appropriate model, endpoint, and reasoning setting.
 
+## Run locally
+
+One small model can make both model calls on this machine, under a fixed memory budget. It is not fine-tuned for this agent. [GUI-Owl-1.5-2B-Instruct](https://huggingface.co/mPLUG/GUI-Owl-1.5-2B-Instruct) (Q4_K_M, text only) runs through `llama-server` (Metal, CUDA, ROCm/HIP, Vulkan):
+
+```bash
+uv run jev-local   # prints the .env lines to use
+```
+
+It runs on the GPU when llama.cpp has one (Metal, CUDA, ROCm, Vulkan) and falls back to the CPU otherwise; use
+`--device gpu|cpu` to choose. `jev-local` pins every setting that can grow memory: one slot, 4,096-token context, 8-bit KV cache, no host prompt cache. It stops the server if its resident memory passes 1,792 MB, leaving 256 MB of the 2 GB budget for the agent. On an M4 the warm server measured 1,393 MB.
+
+With `DECISION_MODEL_BASE_URL` set, each step asks one question over every observed action. The answer is read from the model's next-token probabilities in two option orders, and the two readings are averaged to reduce position bias. The model still only chooses among observed actions. Code tracks which goal values are already set or typed. `DONE` is held back while values are missing, unless a yes/no readout says the page shows the goal's outcome. Repeated actions are made less likely, and actions the executor refused are excluded on the same page. In local mode, `TYPE_TEXT` first lets the model pick among goal values not yet set elsewhere, then falls back to free text.
+
+Local mode is experimental. On an M4 it passed the local hotel fixture in every repeat (5.2–6.0 s) and opened the Wikipedia Gödel article 5/5 (about 18 s). Two newer checks passed less often: a second hotel goal (Nature stays, Serra Lodge) passed 2/2, and a reading-room article passed 1/2. It failed a second Wikipedia search (Eiffel Tower) 0/2: it opens "Search for pages containing" instead of the article. It failed Google Flights in every run: it sets both cities, then searches before setting one-way and the date. Qwen3.5-0.8B and Qwen3.5-2B scored lower in the same tests.
+
+## Watch it run
+
+```bash
+uv run jev-window   # opens a visible browser with its own profile; prints BU_CDP_WS and JEV_SHOW=1
+```
+
+Add the two printed lines to `.env`, then run any example. The agent's tab opens in the foreground. A cursor glides to each target, the target is outlined, clicks show a ripple, and text is typed character by character. The overlay is display only: it holds no text or controls, ignores the pointer, and input still goes through the same hit-tested CDP path. The 21 browser guard checks pass with it on. Animation adds about 0.3 s per action (hotel fixture: 7.1 s headed against 5.3 s headless), so leave `JEV_SHOW` unset for timed runs. Your own browser profile is never used.
+
+## Jev Browser
+
+[`browser/`](browser/) is a Chromium-based desktop browser (Electron) with the agent built in. It has tabs, private
+tabs, bookmarks, history and downloads; settings; first-run onboarding with a system check and model download; and an
+agent side panel that works on the current tab. The panel asks before using a new site and before risky clicks. Run
+`cd browser && npm install && npm start`, or build a macOS installer with `npm run dist`. See
+[browser/README.md](browser/README.md).
+
+## Chat in the browser
+
+The [extension](extension/) adds a side panel. You type a goal, and the local agent works on the tab you are viewing, posting each step as it happens.
+
+```bash
+uv run jev-local     # model server under 2 GB; copy its lines into .env
+uv run jev-chat      # prints a pairing token; reads .env
+```
+
+1. In Chrome or Brave, open `chrome://extensions`, turn on Developer mode, and **Load unpacked** the `extension/` folder.
+2. Allow remote debugging once at `chrome://inspect/#remote-debugging` so the agent can reach your tabs. Or run `uv run jev-window`, which opens a separate window with its own profile and the extension already loaded.
+3. Click the toolbar icon, paste the pairing token, and send a goal. **Stop** ends the run before the next action.
+
+The agent acts on your logged-in tab with your accounts, so watch it and use Stop if needed. It never navigates, resizes or closes that tab on its own; it only detaches when finished. The chat server accepts only loopback requests that come from an extension and carry the pairing token. Page and model text are shown as plain text, never as HTML. A final "done" is the agent's own claim; check the page.
+
 ## Use the library
 
 ```python

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <title>Jev Browser</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="chrome">
+    <div id="tabstrip">
+      <div id="tabs" role="tablist"></div>
+      <button id="new-tab" class="icon" title="New tab (⌘T)" aria-label="New tab">+</button>
+    </div>
+    <div id="toolbar">
+      <button id="back" class="icon" title="Back (⌘[)" aria-label="Back">‹</button>
+      <button id="forward" class="icon" title="Forward (⌘])" aria-label="Forward">›</button>
+      <button id="reload" class="icon" title="Reload (⌘R)" aria-label="Reload">↻</button>
+      <form id="omnibox-form">
+        <span id="private-badge" class="badge" hidden>Private</span>
+        <input id="omnibox" spellcheck="false" autocomplete="off" placeholder="Search or enter address" aria-label="Address">
+        <button type="button" id="star" class="icon star" title="Bookmark this page (⌘D)" aria-label="Bookmark">☆</button>
+      </form>
+      <button id="toggle-agent" class="pill" title="Agent panel (⌘J)">⚡ Agent</button>
+      <button id="open-library" class="icon" title="Library (⌘Y)" aria-label="Library">☰</button>
+      <button id="open-settings" class="icon" title="Settings (⌘,)" aria-label="Settings">⚙</button>
+    </div>
+  </div>
+
+  <aside id="agent">
+    <header>
+      <span>Agent</span>
+      <span id="agent-status" class="status">offline</span>
+    </header>
+    <main id="log" aria-live="polite">
+      <div class="msg note">Tell me what to do on this tab. I click, type, choose and scroll, and I only act on things visible on the page. I ask before anything that buys, sends or deletes, and you can stop me at any time.</div>
+    </main>
+    <div id="prompt" class="prompt" hidden>
+      <p id="prompt-text"></p>
+      <div class="actions" id="prompt-actions"></div>
+    </div>
+    <form id="ask">
+      <textarea id="goal" rows="3" placeholder="e.g. Find an in-stock notebook and order it" required></textarea>
+      <div class="row">
+        <span id="agent-detail" class="detail"></span>
+        <button type="button" id="stop" class="danger" hidden>Stop</button>
+        <button type="submit" id="send" class="primary">Send</button>
+      </div>
+    </form>
+  </aside>
+
+  <section id="library" class="overlay" hidden>
+    <div class="sheet wide">
+      <header><h1>Library</h1><button class="icon close" data-close aria-label="Close">✕</button></header>
+      <nav class="seg" role="tablist">
+        <button data-pane="bookmarks" class="on">Bookmarks</button>
+        <button data-pane="history">History</button>
+        <button data-pane="downloads">Downloads</button>
+      </nav>
+      <div class="pane" data-pane="bookmarks"><ul id="bookmark-list" class="list"></ul></div>
+      <div class="pane" data-pane="history" hidden>
+        <div class="row"><input id="history-search" type="search" placeholder="Search history">
+          <button id="clear-history" class="ghost">Clear history</button></div>
+        <ul id="history-list" class="list"></ul>
+      </div>
+      <div class="pane" data-pane="downloads" hidden><ul id="download-list" class="list"></ul></div>
+    </div>
+  </section>
+
+  <section id="settings" class="overlay" hidden>
+    <div class="sheet">
+      <header><h1>Settings</h1><button class="icon close" data-close aria-label="Close">✕</button></header>
+      <h2>Browsing</h2>
+      <label>Search engine
+        <select id="set-search">
+          <option value="duckduckgo">DuckDuckGo</option><option value="google">Google</option>
+          <option value="bing">Bing</option><option value="brave">Brave Search</option>
+        </select></label>
+      <label>Home page <input id="set-home" type="url"></label>
+      <h2>Agent</h2>
+      <label>Mode
+        <select id="set-mode">
+          <option value="local">On this computer (GUI-Owl 2B, no account)</option>
+          <option value="hosted">Hosted Jev (uses TYPESAFE_API_KEY from .env)</option>
+        </select></label>
+      <label>Accelerator
+        <select id="set-device">
+          <option value="auto">Automatic (GPU when available, otherwise CPU)</option>
+          <option value="gpu">GPU only</option><option value="cpu">CPU only</option>
+        </select></label>
+      <label>Memory limit for the local model
+        <select id="set-budget"><option value="2048">2 GB</option><option value="2560">2.5 GB</option></select></label>
+      <label class="check"><input id="set-cursor" type="checkbox"> Show the agent's cursor and typing</label>
+      <label class="check"><input id="set-confirm" type="checkbox"> Ask before buying, sending or deleting</label>
+      <label class="check"><input id="set-autostart" type="checkbox"> Start the agent when the browser opens</label>
+      <div class="row model-row"><span id="model-line" class="detail"></span>
+        <button id="model-download" class="ghost" hidden>Download model</button></div>
+      <p class="hint">Mode and memory changes apply the next time Jev Browser starts.</p>
+      <h2>Sites</h2>
+      <ul id="site-list" class="list compact"></ul>
+      <h2>Privacy</h2>
+      <div class="row"><button id="settings-clear-history" class="ghost">Clear browsing history</button>
+        <span class="detail">Private tabs never save history and forget cookies when the last one closes.</span></div>
+      <footer><button class="primary" data-close>Done</button></footer>
+    </div>
+  </section>
+
+  <section id="onboarding" class="overlay" hidden>
+    <div class="sheet welcome">
+      <ol class="dots" aria-hidden="true"><li></li><li></li><li></li><li></li></ol>
+      <div class="step" data-step="1">
+        <div class="hero">⚡</div>
+        <h1>Welcome to Jev Browser</h1>
+        <p>A browser with an agent built in. Tell it what you want on a page, and it clicks, types and chooses for
+          you while you watch.</p>
+        <footer><button class="primary" data-next>Get started</button></footer>
+      </div>
+      <div class="step" data-step="2" hidden>
+        <h1>Where should the agent run?</h1>
+        <label class="choice"><input type="radio" name="mode" value="local" checked>
+          <span><b>On this computer</b> · free, private, no account. Uses about 1.4 GB of memory (limit 2 GB).</span></label>
+        <label class="choice"><input type="radio" name="mode" value="hosted">
+          <span><b>Hosted Jev</b> · faster and more accurate. Needs a TypeSafe API key in <code>.env</code>.</span></label>
+        <footer><button data-back>Back</button><button class="primary" data-next>Continue</button></footer>
+      </div>
+      <div class="step" data-step="3" hidden>
+        <h1>Checking this computer</h1>
+        <ul id="check-list" class="checks"></ul>
+        <div id="download-box" hidden>
+          <div class="bar"><span id="download-fill"></span></div>
+          <div class="row"><span id="download-text" class="detail"></span>
+            <button id="download-start" class="primary">Download model (1.1 GB)</button>
+            <button id="download-cancel" class="ghost" hidden>Cancel</button></div>
+        </div>
+        <footer><button data-back>Back</button><button id="check-next" class="primary" data-next disabled>Continue</button></footer>
+      </div>
+      <div class="step" data-step="4" hidden>
+        <h1>What the agent can do</h1>
+        <ul class="rules">
+          <li>It acts only on the tab you are viewing, only with clicks, typing, choices and scrolling.</li>
+          <li>It asks before using a site for the first time, and before anything that buys, sends or deletes.</li>
+          <li>It uses your logged-in sessions on that tab. Watch it, and press <b>Stop</b> whenever you want.</li>
+          <li>It never sees your other tabs, saved passwords or files.</li>
+          <li>"Done" is its own claim. Always check the result.</li>
+        </ul>
+        <footer><button data-back>Back</button><button class="primary" data-finish>Try it on a practice shop</button></footer>
+      </div>
+    </div>
+  </section>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 """Offline contracts for a dynamic operation/target policy. No paid APIs."""
 
 import json
+import math
 import time
 from copy import deepcopy
 from unittest.mock import Mock
@@ -153,8 +154,143 @@ def test_quoted_task_text_still_uses_the_llm(monkeypatch):
 
 def test_missing_text_credential_stops_before_guessing(monkeypatch):
     monkeypatch.delenv("TEXT_MODEL_API_KEY", raising=False)
+    monkeypatch.delenv("TEXT_MODEL_BASE_URL", raising=False)
     with pytest.raises(ValueError, match="TEXT_MODEL_API_KEY"):
         model.field_text({"goal": 'Enter "Zurich"'})
+
+
+def test_local_servers_need_no_credentials(monkeypatch):
+    urls = []
+
+    def post(url, key, body):
+        urls.append((url, key))
+        if "questions" not in body:
+            return {"choices": [{"message": {"content": '{"text":"Zurich"}'}}]}
+        return {
+            "model": "kev-latest",
+            "answers": {
+                "operation": choice(body["questions"]["operation"]["criteria"], "CLICK"),
+                "click_target": choice(body["questions"]["click_target"]["criteria"], "2"),
+            },
+        }
+
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.delenv("TEXT_MODEL_API_KEY", raising=False)
+    monkeypatch.setenv("TYPESAFE_BASE_URL", "http://127.0.0.1:8008/")
+    monkeypatch.setenv("TEXT_MODEL_BASE_URL", "http://localhost:8080/v1")
+    monkeypatch.setattr(model, "post_json", post)
+    assert model.choose(page(), "Find a book", [])["choice"] == "e3"
+    assert model.field_text({"goal": 'Enter "Zurich"'})[0] == "Zurich"
+    assert urls == [("http://127.0.0.1:8008/v1/systemone", ""), ("http://localhost:8080/v1/chat/completions", "")]
+
+
+def local_decider(monkeypatch, pick):
+    """Fake llama-server: /apply-template echoes the menu; /completion puts most mass on the letter `pick` chooses."""
+    prompts = []
+
+    def post(url, _key, body):
+        if url.endswith("/apply-template"):
+            return {"prompt": body["messages"][1]["content"]}
+        prompts.append(body["prompt"])
+        menu = [line for line in body["prompt"].splitlines() if line.startswith("[")]
+        letter = pick(menu)
+        other = "B" if letter != "B" else "C"
+        return {"completion_probabilities": [{"top_logprobs": [
+            {"token": letter, "logprob": math.log(0.7)}, {"token": other, "logprob": math.log(0.2)},
+            {"token": "hello", "logprob": math.log(0.1)},
+        ]}], "tokens_evaluated": 99}
+
+    monkeypatch.setenv("DECISION_MODEL_BASE_URL", "http://127.0.0.1:8080")
+    monkeypatch.delenv("DECISION_MODEL_API_KEY", raising=False)
+    monkeypatch.delenv("TEXT_MODEL_BASE_URL", raising=False)
+    monkeypatch.setattr(model, "post_json", post)
+    monkeypatch.setattr(model, "VALUES", {})
+    monkeypatch.setattr(model, "DEFERRED", {})
+    monkeypatch.setattr(model, "SEEN", {})
+    monkeypatch.setattr(model, "REFUSED", {})
+    return prompts
+
+
+def test_local_decider_maps_one_joint_choice_to_an_observed_action(monkeypatch):
+    local_decider(monkeypatch, lambda menu: next(m[1] for m in menu if "type text into" in m))
+    d = model.choose(page(), "Find a book", [])
+    assert (d["choice"], d["operation"], d["target"]) == ("e1", "TYPE_TEXT", "1")
+    assert d["probabilities"]["e1"] == pytest.approx(0.7 / 0.9)
+    assert sum(d["operation_probabilities"].values()) == pytest.approx(1)
+    assert d["usage"]["input_tokens"] == 99
+
+
+def test_local_decider_keeps_unlabeled_tokens_out_and_shortlists_large_pages(monkeypatch):
+    p = page()
+    p["actions"] = [
+        {"id": f"e{i}", "kind": "click", "label": f"Item {i}", "role": "link", "node": i} for i in range(80)
+    ]
+    p["actions"].append({"id": "wait", "kind": "wait", "label": "Wait"})
+    prompts = local_decider(monkeypatch, lambda menu: next((m[1] for m in menu if "'Item 61'" in m), "A"))
+    d = model.choose(p, "Open item 61", [])
+    assert d["choice"] == "e61" and d["operation"] == "CLICK"
+    assert len(prompts) == 2 and len(d["raw_answers"]["next"]) == len(model.LABELS)
+    assert all("hello" not in key for key in d["raw_answers"]["next"])
+
+
+def test_a_choice_the_executor_refused_is_not_repeated_on_the_same_page(monkeypatch):
+    local_decider(monkeypatch, lambda menu: "A")
+    p = page()
+    picks = [model.choose(p, "Find a book", [])["choice"] for _ in range(3)]
+    assert len(set(picks)) == 3
+
+
+def test_option_order_is_averaged_so_a_position_bias_cannot_win(monkeypatch):
+    local_decider(monkeypatch, lambda menu: "A")
+    d = model.choose(page(), "Find a book", [])
+    first, last = d["raw_answers"]["next"]["e1"], d["raw_answers"]["next"]["DONE"]
+    assert first == pytest.approx(last)
+
+
+def test_goal_values_must_be_copied_from_the_goal(monkeypatch):
+    monkeypatch.setenv("TEXT_MODEL_BASE_URL", "http://127.0.0.1:8080/v1")
+    monkeypatch.setattr(model, "VALUES", {})
+    content = json.dumps({"values": [{"value": "Zurich", "phrase": "from Zurich"},
+                                     {"value": "September 20, 2026", "phrase": "on September 20, 2026"},
+                                     {"value": "Paris", "phrase": "to Paris"},
+                                     {"value": "one-way", "phrase": "cheap one-way"}]})
+    monkeypatch.setattr(model, "post_json", Mock(return_value={"choices": [{"message": {"content": content}}]}))
+    goal = "Find one-way flights from Zurich on September 20, 2026."
+    assert model.goal_values(goal) == [("Zurich", "from Zurich"), ("September 20, 2026", "on September 20, 2026"),
+                                       ("one-way", "one-way")]
+    current = model.settings([{"kind": "fill", "label": "Departure", "value": "Sun, Sep 20", "node": 1},
+                              {"kind": "click", "label": "Ticket type", "role": "combobox", "value": "One way",
+                               "node": 2}])
+    assert model.is_set("September 20, 2026", current) and model.is_set("one-way", current)
+    assert not model.is_set("Zurich", current)
+
+
+def test_done_is_held_back_while_goal_values_are_missing_then_accepted(monkeypatch):
+    local_decider(monkeypatch, lambda menu: next(m[1] for m in menu if "done:" in m))
+    model.VALUES["Search for Lisbon"] = [("Lisbon", "for Lisbon")]
+    first = model.choose(page(), "Search for Lisbon", [])
+    assert first["choice"] != "DONE" and first["raw_answers"]["missing"] == ["for Lisbon"]
+    clicked = [{"action": "Go", "kind": "click"}]
+
+    def fresh(n):
+        p = page()
+        p["fingerprint"] = f"page-{n}"
+        return p
+
+    held = [model.choose(fresh(n), "Search for Lisbon", clicked)["choice"] for n in range(model.HOLDS)]
+    assert held[:-1] == [c for c in held[:-1] if c != "DONE"] and held[-1] == "DONE"
+    typed = [{"action": "Search", "kind": "fill", "text": "Lisbon"}]
+    assert model.choose(fresh(9), "Search for Lisbon", typed)["choice"] != "DONE"
+
+
+def test_hosted_decision_server_needs_a_credential(monkeypatch):
+    post = Mock()
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.delenv("TYPESAFE_BASE_URL", raising=False)
+    monkeypatch.setattr(model, "post_json", post)
+    with pytest.raises(ValueError, match="TYPESAFE_API_KEY"):
+        model.choose(page(), "Find a book", [])
+    post.assert_not_called()
 
 
 @pytest.fixture
@@ -318,3 +454,14 @@ def test_navigation_during_prediction_reobserves_without_action(runner):
     assert runner.state["status"] == "ready"
     assert runner.state["decision"] is None
     runner.state["browser"].act.assert_not_called()
+
+
+def test_a_declined_confirmation_stops_before_any_mutation(runner, monkeypatch):
+    seen = []
+    runner.confirm = lambda action: seen.append(action["id"]) or False
+    text = Mock()
+    monkeypatch.setattr(loop, "field_text", text)
+    state = runner.command("act", {"fingerprint": runner.state["page"]["fingerprint"]})
+    assert seen == ["e1"] and state["status"] == "stopped"
+    runner.state["browser"].act.assert_not_called()
+    text.assert_not_called()

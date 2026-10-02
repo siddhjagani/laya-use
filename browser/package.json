@@ -1,0 +1,119 @@
+{
+  "name": "jev-browser",
+  "productName": "Jev Browser",
+  "version": "0.1.0",
+  "description": "A Chromium-based browser with a built-in local agent.",
+  "main": "main.js",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "env -u ELECTRON_RUN_AS_NODE electron .",
+    "check": "for f in main.js preload.js services.js model.js system.js store.js ui/app.js; do node --check $f || exit 1; done",
+    "test": "node --test test/*.test.js",
+    "dist": "env -u ELECTRON_RUN_AS_NODE electron-builder --mac dmg --arm64",
+    "pack": "env -u ELECTRON_RUN_AS_NODE electron-builder --dir",
+    "dist:linux": "env -u ELECTRON_RUN_AS_NODE electron-builder --linux deb AppImage --x64 --arm64 -c.productName=jev-browser"
+  },
+  "devDependencies": {
+    "electron": "44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "ai.jev.browser",
+    "productName": "Jev Browser",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "services.js",
+      "model.js",
+      "system.js",
+      "store.js",
+      "ui/**",
+      "practice/**",
+      "package.json",
+      "build/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "../jev_ultrafast",
+        "to": "agent/jev_ultrafast",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**"
+        ]
+      },
+      {
+        "from": "../pyproject.toml",
+        "to": "agent/pyproject.toml"
+      },
+      {
+        "from": "../uv.lock",
+        "to": "agent/uv.lock"
+      },
+      {
+        "from": "../README.md",
+        "to": "agent/README.md"
+      },
+      {
+        "from": "../LICENSE",
+        "to": "agent/LICENSE"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg"
+      ],
+      "identity": null,
+      "icon": "build/icon.png"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "category": "Network",
+      "icon": "build/icon.png",
+      "executableName": "jev-browser",
+      "synopsis": "Browser with a built-in local agent",
+      "maintainer": "Siddh Jagani <siddh.jain@jwero.com>",
+      "desktop": {
+        "entry": {
+          "Name": "Jev Browser",
+          "Comment": "Browser with a built-in local agent",
+          "Categories": "Network;WebBrowser;",
+          "StartupWMClass": "Jev Browser"
+        }
+      }
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0",
+        "libasound2t64 | libasound2"
+      ]
+    }
+  },
+  "author": {
+    "name": "Siddh Jagani",
+    "email": "siddh.jain@jwero.com"
+  },
+  "homepage": "https://github.com/browser-use/jev-ultrafast"
+}
