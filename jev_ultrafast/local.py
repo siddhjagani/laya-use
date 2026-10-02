@@ -18,7 +18,7 @@ BUDGET_MB = 2048
 AGENT_RESERVE_MB = 256  # the agent's own Python process; the browser is not counted
 # Every setting that can grow memory is pinned: one slot, a fixed 8-bit KV cache, no host prompt cache, no auto-fit.
 FLAGS = [
-    "--ctx-size", "4096", "--parallel", "1", "--cache-type-k", "q8_0", "--cache-type-v", "q8_0",
+    "--parallel", "1", "--cache-type-k", "q8_0", "--cache-type-v", "q8_0",
     "--cache-ram", "0", "--fit", "off", "--no-mmproj", "--jinja",
 ]
 # GPU: offload every layer (Metal, CUDA, ROCm/HIP or Vulkan, whichever this llama.cpp build has). CPU: offload nothing.
@@ -91,9 +91,9 @@ def port_free(port):
         return probe.connect_ex(("127.0.0.1", port)) != 0
 
 
-def launch(device, source, port, key):
+def launch(device, source, port, key, tuning=()):
     """Start llama-server on one device and warm it up. Raises StartFailed if it cannot run there."""
-    server = subprocess.Popen([llama_server(), *source, *FLAGS, *DEVICE_FLAGS[device], "--host", "127.0.0.1",
+    server = subprocess.Popen([llama_server(), *source, *FLAGS, *DEVICE_FLAGS[device], *tuning, "--host", "127.0.0.1",
                                "--port", str(port), "--api-key", key])
     base = f"http://127.0.0.1:{port}"
     try:
@@ -126,7 +126,11 @@ def main():
     parser.add_argument("--budget-mb", type=int, default=BUDGET_MB)
     parser.add_argument("--device", choices=["auto", "gpu", "cpu"], default=os.environ.get("JEV_DEVICE", "auto"),
                         help="auto: GPU when available, otherwise or on failure the CPU")
+    parser.add_argument("--ctx-size", type=int, default=4096, choices=[2048, 4096, 8192],
+                        help="context window; larger fits longer pages and uses more memory")
+    parser.add_argument("--threads", type=int, default=0, help="CPU threads; 0 lets llama.cpp choose")
     args = parser.parse_args()
+    tuning = ["--ctx-size", str(args.ctx_size), *(["--threads", str(args.threads)] if args.threads > 0 else [])]
     limit = args.budget_mb - AGENT_RESERVE_MB
     if args.model and Path(args.model).stat().st_size / 2**20 > limit * 0.8:
         sys.exit(f"{args.model} leaves too little of the {args.budget_mb} MB budget for its cache.")
@@ -141,7 +145,7 @@ def main():
     server, device = None, None
     for attempt in order:
         try:
-            server, device = launch(attempt, source, args.port, key), attempt
+            server, device = launch(attempt, source, args.port, key, tuning), attempt
             break
         except StartFailed as error:
             print(f"{error}{' Trying the CPU.' if attempt != order[-1] else ''}", flush=True)

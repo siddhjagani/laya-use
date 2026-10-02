@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
-const { Library, HISTORY_LIMIT } = require("../store");
+const { Library, Sessions, HISTORY_LIMIT } = require("../store");
 const system = require("../system");
 
 test("bookmarks toggle, persist, and ignore non-web pages", () => {
@@ -45,7 +45,9 @@ test("system check lists every requirement and needs no model to be ready", () =
   const result = system.check({ dataDir: os.tmpdir(), modelPath: null, modelSize: 1e9, budgetMb: 2048 });
   assert.deepEqual(result.items.map((i) => i.id), ["memory", "disk", "uv", "llama", "accelerator", "model"]);
   assert.equal(result.items.find((i) => i.id === "accelerator").optional, true);
-  assert.equal(result.items.find((i) => i.id === "model").optional, true);
+  const model = result.items.find((i) => i.id === "model");
+  assert.equal(model.setup, true, "a missing model is set up by the app, not by the user");
+  assert.equal(result.needsSetup, true);
 });
 
 test("memory blocks only below the agent budget plus headroom", () => {
@@ -62,4 +64,20 @@ test("memory blocks only below the agent budget plus headroom", () => {
   } finally {
     os.totalmem = real;
   }
+});
+
+test("agent chats are saved, titled by the first goal, listed newest first and removable", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "jev-chat-"));
+  const sessions = new Sessions(dir);
+  const first = sessions.create();
+  sessions.append(first.id, { kind: "you", text: "Find an in-stock notebook" });
+  sessions.append(first.id, { kind: "thinking", text: "The search box is empty." });
+  const second = sessions.create();
+  sessions.append(second.id, { kind: "you", text: "Open the article" });
+  sessions.flush();
+  const reopened = new Sessions(dir);
+  assert.deepEqual(reopened.list().map((s) => s.title), ["Open the article", "Find an in-stock notebook"]);
+  assert.deepEqual(reopened.get(first.id).messages.map((m) => m.kind), ["you", "thinking"]);
+  reopened.remove(first.id);
+  assert.equal(reopened.list().length, 1);
 });

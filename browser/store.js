@@ -92,4 +92,61 @@ class Library {
   }
 }
 
-module.exports = { Store, Library, HISTORY_LIMIT };
+const SESSION_LIMIT = 200;
+
+// Agent chats: each keeps its transcript (goals, steps, thinking, prompts, results) so it can be reopened later.
+class Sessions {
+  constructor(dir) {
+    this.store = new Store(path.join(dir, "agent-sessions.json"), []);
+  }
+
+  list() {
+    return this.store.data.map(({ messages, ...meta }) => ({ ...meta, count: messages.length }))
+      .sort((a, b) => b.updated - a.updated);
+  }
+
+  get(id) {
+    return this.store.data.find((s) => s.id === id) || null;
+  }
+
+  create() {
+    const session = { id: `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, title: "New chat",
+                      created: Date.now(), updated: Date.now(), messages: [] };
+    this.store.data.unshift(session);
+    this.store.data.length = Math.min(this.store.data.length, SESSION_LIMIT);
+    this.store.save();
+    return session;
+  }
+
+  append(id, message) {
+    const session = this.get(id) || this.create();
+    const entry = { kind: String(message.kind || "info").slice(0, 20), text: String(message.text || "").slice(0, 4000),
+                    at: Date.now() };
+    session.messages.push(entry);
+    if (session.title === "New chat" && entry.kind === "you") session.title = entry.text.slice(0, 80);
+    session.updated = Date.now();
+    this.store.save();
+    return session;
+  }
+
+  rename(id, title) {
+    const session = this.get(id);
+    if (session) { session.title = String(title).slice(0, 80) || session.title; this.store.save(); }
+  }
+
+  remove(id) {
+    this.store.data = this.store.data.filter((s) => s.id !== id);
+    this.store.save();
+  }
+
+  clear() {
+    this.store.data = [];
+    this.store.save(true);
+  }
+
+  flush() {
+    if (this.store.timer) this.store.save(true);
+  }
+}
+
+module.exports = { Store, Library, Sessions, HISTORY_LIMIT, SESSION_LIMIT };

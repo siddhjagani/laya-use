@@ -30,8 +30,10 @@ function findUv() {
 class Services {
   // agentDir: the Python agent project (the repository in development, app resources when packaged).
   // venvDir: where uv keeps its environment when the project folder is read-only (packaged apps).
-  constructor({ cdpPort, log, agentDir, venvDir }) {
+  // runtime(): current { uv, llama } paths from the automatic setup (Setup), so nothing has to be on PATH.
+  constructor({ cdpPort, log, agentDir, venvDir, runtime }) {
     this.cdpPort = cdpPort;
+    this.runtime = runtime || (() => ({}));
     this.agentDir = agentDir;
     this.venvDir = venvDir;
     this.log = log;
@@ -53,15 +55,18 @@ class Services {
   }
 
   env(extra) {
-    const env = { ...process.env, ...extra, JEV_PARENT_PID: String(process.pid) };
+    const { llama, libPath } = this.runtime();
+    const env = { ...process.env, ...(llama ? { JEV_LLAMA_SERVER: llama } : {}), ...extra,
+                  JEV_PARENT_PID: String(process.pid) };
+    if (libPath) env.LD_LIBRARY_PATH = [libPath, env.LD_LIBRARY_PATH].filter(Boolean).join(":");
     if (this.venvDir) env.UV_PROJECT_ENVIRONMENT = this.venvDir;
     delete env.ELECTRON_RUN_AS_NODE;
     return env;
   }
 
   spawn(name, args, extra, onLine) {
-    const uv = findUv();
-    if (!uv) throw new Error("uv was not found. Install it from https://docs.astral.sh/uv/ and restart.");
+    const uv = this.runtime().uv || findUv();
+    if (!uv) throw new Error("The Python runtime is not set up yet. Open Settings → Model → Set up.");
     const packaged = this.venvDir ? ["--frozen", "--no-editable"] : [];
     const child = spawn(uv, ["run", ...packaged, "--project", this.agentDir, ...args],
                         { cwd: this.agentDir, env: this.env(extra) });
@@ -95,7 +100,9 @@ class Services {
       this.set({ model: "starting", detail: "Starting the local model (about 1.4 GB of memory)…" });
       await new Promise((resolve, reject) => {
         this.spawn("model", ["jev-local", "--model", modelPath, "--port", String(MODEL_PORT),
-                             "--budget-mb", String(settings.agent.budgetMb), "--device", settings.agent.device || "auto"],
+                             "--budget-mb", String(settings.agent.budgetMb), "--device", settings.agent.device || "auto",
+                             "--ctx-size", String(settings.agent.ctxSize || 4096),
+                             "--threads", String(settings.agent.threads || 0)],
           { DECISION_MODEL_API_KEY: this.modelKey }, (line) => {
             if (line.startsWith("Accelerator:")) this.set({ accelerator: line.slice("Accelerator:".length).trim() });
             if (line.startsWith("Warm footprint")) {
@@ -113,6 +120,7 @@ class Services {
       ...modelEnv, JEV_CDP_WS: ws, JEV_CHAT_PORT: String(CHAT_PORT),
       JEV_CHAT_TOKEN: this.chatToken, JEV_SHOW: settings.agent.showCursor ? "1" : "0",
       JEV_CONFIRM: settings.agent.confirmRisky === false ? "0" : "1",
+      JEV_THINK: settings.agent.think ? "1" : "0",
     });
     for (let i = 0; i < 60; i++) {
       try {

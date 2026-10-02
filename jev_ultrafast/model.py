@@ -272,6 +272,9 @@ def choose_local(state, goal, history):
     if values:
         lines.append("Goal values already set: " + (", ".join(p for v, p in values if v in seen) or "none"))
         lines.append("Goal values not set yet: " + (", ".join(missing) or "none"))
+    thinking = think(lines, [o[3] for o in options]) if os.environ.get("JEV_THINK") == "1" else None
+    if thinking:
+        lines.append(f"Your notes about the next step: {thinking}")
     system = "You control a web browser. Choose the single next action that advances the user's entire goal."
     probabilities, result, prompt = ask(base, key, system, "\n".join(lines), [o[3] for o in options],
                                         "Which action should be taken next?")
@@ -321,7 +324,33 @@ def choose_local(state, goal, history):
         "usage": {"input_tokens": result.get("tokens_evaluated"), "cached_tokens": result.get("tokens_cached")},
         "latency_ms": round((time.perf_counter() - started) * 1000),
         "request": {"prompt": prompt},
+        "thinking": thinking,
     }
+
+
+THINK_PROMPT = """You control a web browser for the user. In two to four short sentences, reason about what is
+already done and which visible action should come next. Do not invent actions that are not listed. Plain text only."""
+
+
+def think(lines, choices):
+    """Optional short reasoning before a decision (JEV_THINK=1). Thinking models return it as reasoning_content."""
+    base = os.environ.get("TEXT_MODEL_BASE_URL", "").rstrip("/")
+    if not base:
+        return None
+    key = credential(base, "TEXT_MODEL_API_KEY", "no thinking generated")
+    menu = "\n".join(f"- {c}" for c in choices)
+    result = post_json(base + "/chat/completions", key, {
+        "model": os.environ.get("TEXT_MODEL", "local"), "temperature": 0, "max_tokens": 160,
+        "messages": [{"role": "system", "content": THINK_PROMPT},
+                     {"role": "user", "content": "\n".join(lines) + f"\n\nVisible actions:\n{menu}"}],
+        "chat_template_kwargs": {"enable_thinking": True},
+    })
+    try:
+        message = result["choices"][0]["message"]
+    except (KeyError, IndexError, TypeError):
+        return None
+    text = (message.get("reasoning_content") or message.get("content") or "").strip()
+    return text[:800] or None
 
 
 def choose(state, goal, history):

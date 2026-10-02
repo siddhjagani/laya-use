@@ -1,14 +1,14 @@
 {
   "name": "jev-browser",
   "productName": "Jev Browser",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A Chromium-based browser with a built-in local agent.",
   "main": "main.js",
   "private": true,
   "license": "MIT",
   "scripts": {
     "start": "env -u ELECTRON_RUN_AS_NODE electron .",
-    "check": "for f in main.js preload.js services.js model.js system.js store.js ui/app.js; do node --check $f || exit 1; done",
+    "check": "for f in main.js preload.js services.js model.js system.js store.js setup.js updater.js ui/app.js; do node --check $f || exit 1; done",
     "test": "node --test test/*.test.js",
     "dist": "env -u ELECTRON_RUN_AS_NODE electron-builder --mac dmg --arm64",
     "pack": "env -u ELECTRON_RUN_AS_NODE electron-builder --dir",
@@ -32,10 +32,12 @@
       "model.js",
       "system.js",
       "store.js",
+      "setup.js",
+      "updater.js",
       "ui/**",
       "practice/**",
-      "package.json",
-      "build/icon.png"
+      "build/icon.png",
+      "package.json"
     ],
     "extraResources": [
       {

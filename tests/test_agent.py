@@ -465,3 +465,23 @@ def test_a_declined_confirmation_stops_before_any_mutation(runner, monkeypatch):
     assert seen == ["e1"] and state["status"] == "stopped"
     runner.state["browser"].act.assert_not_called()
     text.assert_not_called()
+
+
+def test_thinking_is_optional_and_reported(monkeypatch):
+    local_decider(monkeypatch, lambda menu: "A")
+    d = model.choose(page(), "Find a book", [])
+    assert d["thinking"] is None
+    monkeypatch.setenv("JEV_THINK", "1")
+    monkeypatch.setenv("TEXT_MODEL_BASE_URL", "http://127.0.0.1:8080/v1")
+    original = model.post_json
+
+    def post(url, key, body):
+        if url.endswith("/chat/completions") and "Visible actions" in body["messages"][1]["content"]:
+            return {"choices": [{"message": {"reasoning_content": "Type the title first.", "content": ""}}]}
+        if url.endswith("/chat/completions"):
+            return {"choices": [{"message": {"content": '{"values": [], "outcome": "x"}'}}]}
+        return original(url, key, body)
+
+    monkeypatch.setattr(model, "post_json", post)
+    d = model.choose(page(), "Find a book", [])
+    assert d["thinking"] == "Type the title first."

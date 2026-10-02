@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data: https:">
   <title>Jev Browser</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -10,98 +10,296 @@
   <div id="chrome">
     <div id="tabstrip">
       <div id="tabs" role="tablist"></div>
-      <button id="new-tab" class="icon" title="New tab (⌘T)" aria-label="New tab">+</button>
+      <button id="new-tab" class="icon-btn sm" data-icon="plus" data-icon-size="16" title="New tab (Ctrl+T)" aria-label="New tab"></button>
     </div>
     <div id="toolbar">
-      <button id="back" class="icon" title="Back (⌘[)" aria-label="Back">‹</button>
-      <button id="forward" class="icon" title="Forward (⌘])" aria-label="Forward">›</button>
-      <button id="reload" class="icon" title="Reload (⌘R)" aria-label="Reload">↻</button>
+      <button id="back" class="icon-btn" data-icon="back" title="Back" aria-label="Back"></button>
+      <button id="forward" class="icon-btn" data-icon="forward" title="Forward" aria-label="Forward"></button>
+      <button id="reload" class="icon-btn" data-icon="reload" data-icon-size="17" title="Reload" aria-label="Reload"></button>
+      <button id="home" class="icon-btn" data-icon="home" data-icon-size="17" title="Home" aria-label="Home" hidden></button>
       <form id="omnibox-form">
+        <span id="site-icon" class="site-icon" data-icon="lock" data-icon-size="14"></span>
         <span id="private-badge" class="badge" hidden>Private</span>
         <input id="omnibox" spellcheck="false" autocomplete="off" placeholder="Search or enter address" aria-label="Address">
-        <button type="button" id="star" class="icon star" title="Bookmark this page (⌘D)" aria-label="Bookmark">☆</button>
+        <button type="button" id="zoom-badge" class="zoom" hidden title="Reset zoom"></button>
+        <button type="button" id="star" class="icon-btn sm star" data-icon="star" data-icon-size="16" title="Bookmark this page (Ctrl+D)" aria-label="Bookmark"></button>
       </form>
-      <button id="toggle-agent" class="pill" title="Agent panel (⌘J)">⚡ Agent</button>
-      <button id="open-library" class="icon" title="Library (⌘Y)" aria-label="Library">☰</button>
-      <button id="open-settings" class="icon" title="Settings (⌘,)" aria-label="Settings">⚙</button>
+      <button id="update-badge" class="icon-btn update" data-icon="update" hidden title="Update available" aria-label="Update available"></button>
+      <button id="toggle-agent" class="icon-btn agent" data-icon="sparkles" title="Agent (Ctrl+J)" aria-label="Agent"></button>
+      <button id="open-library" class="icon-btn" data-icon="library" data-icon-size="17" title="Bookmarks, history and downloads (Ctrl+Y)" aria-label="Library"></button>
+      <button id="profile-button" class="avatar" title="Profiles" aria-label="Profiles"></button>
+      <button id="open-settings" class="icon-btn" data-icon="settings" data-icon-size="17" title="Settings (Ctrl+,)" aria-label="Settings"></button>
     </div>
   </div>
 
   <aside id="agent">
     <header>
-      <span>Agent</span>
-      <span id="agent-status" class="status">offline</span>
+      <span class="agent-mark" data-icon="sparkles" data-icon-size="16"></span>
+      <div class="agent-title"><span id="session-title">New chat</span><span id="agent-status" class="status-dot" title="offline"></span></div>
+      <button id="new-chat" class="icon-btn sm" data-icon="compose" data-icon-size="16" title="New chat" aria-label="New chat"></button>
+      <button id="show-chats" class="icon-btn sm" data-icon="history" data-icon-size="16" title="Past chats" aria-label="Past chats"></button>
+      <button id="close-agent" class="icon-btn sm" data-icon="panel" data-icon-size="16" title="Hide panel (Ctrl+J)" aria-label="Hide panel"></button>
     </header>
-    <main id="log" aria-live="polite">
-      <div class="msg note">Tell me what to do on this tab. I click, type, choose and scroll, and I only act on things visible on the page. I ask before anything that buys, sends or deletes, and you can stop me at any time.</div>
-    </main>
+    <div id="chat-list" class="popover" hidden>
+      <label class="searchbox"><span data-icon="search" data-icon-size="14"></span><input id="chat-search" type="search" placeholder="Search chats"></label>
+      <ul id="chats" class="chat-items"></ul>
+    </div>
+    <main id="log" aria-live="polite"></main>
     <div id="prompt" class="prompt" hidden>
-      <p id="prompt-text"></p>
+      <div class="prompt-head"><span data-icon="shield" data-icon-size="16"></span><p id="prompt-text"></p></div>
       <div class="actions" id="prompt-actions"></div>
     </div>
     <form id="ask">
-      <textarea id="goal" rows="3" placeholder="e.g. Find an in-stock notebook and order it" required></textarea>
-      <div class="row">
-        <span id="agent-detail" class="detail"></span>
-        <button type="button" id="stop" class="danger" hidden>Stop</button>
-        <button type="submit" id="send" class="primary">Send</button>
+      <div class="composer">
+        <textarea id="goal" rows="1" placeholder="Ask the agent to do something on this page" required></textarea>
+        <button type="button" id="stop" class="round stop" data-icon="stop" data-icon-size="16" hidden title="Stop" aria-label="Stop"></button>
+        <button type="submit" id="send" class="round" data-icon="send" data-icon-size="16" title="Send (Enter)" aria-label="Send"></button>
       </div>
+      <div id="agent-detail" class="detail"></div>
     </form>
   </aside>
 
   <section id="library" class="overlay" hidden>
     <div class="sheet wide">
-      <header><h1>Library</h1><button class="icon close" data-close aria-label="Close">✕</button></header>
+      <header><h1>Library</h1><button class="icon-btn" data-icon="close" data-close aria-label="Close"></button></header>
       <nav class="seg" role="tablist">
-        <button data-pane="bookmarks" class="on">Bookmarks</button>
-        <button data-pane="history">History</button>
-        <button data-pane="downloads">Downloads</button>
+        <button data-pane="bookmarks" class="on" data-icon="star" data-icon-size="15">Bookmarks</button>
+        <button data-pane="history" data-icon="history" data-icon-size="15">History</button>
+        <button data-pane="downloads" data-icon="download" data-icon-size="15">Downloads</button>
       </nav>
       <div class="pane" data-pane="bookmarks"><ul id="bookmark-list" class="list"></ul></div>
       <div class="pane" data-pane="history" hidden>
-        <div class="row"><input id="history-search" type="search" placeholder="Search history">
-          <button id="clear-history" class="ghost">Clear history</button></div>
+        <div class="row"><label class="searchbox grow"><span data-icon="search" data-icon-size="14"></span>
+          <input id="history-search" type="search" placeholder="Search history"></label>
+          <button id="clear-history" class="btn" data-icon="trash" data-icon-size="15">Clear</button></div>
         <ul id="history-list" class="list"></ul>
       </div>
       <div class="pane" data-pane="downloads" hidden><ul id="download-list" class="list"></ul></div>
     </div>
   </section>
 
-  <section id="settings" class="overlay" hidden>
+  <section id="profiles" class="overlay" hidden>
     <div class="sheet">
-      <header><h1>Settings</h1><button class="icon close" data-close aria-label="Close">✕</button></header>
-      <h2>Browsing</h2>
-      <label>Search engine
-        <select id="set-search">
-          <option value="duckduckgo">DuckDuckGo</option><option value="google">Google</option>
-          <option value="bing">Bing</option><option value="brave">Brave Search</option>
-        </select></label>
-      <label>Home page <input id="set-home" type="url"></label>
-      <h2>Agent</h2>
-      <label>Mode
-        <select id="set-mode">
-          <option value="local">On this computer (GUI-Owl 2B, no account)</option>
-          <option value="hosted">Hosted Jev (uses TYPESAFE_API_KEY from .env)</option>
-        </select></label>
-      <label>Accelerator
-        <select id="set-device">
-          <option value="auto">Automatic (GPU when available, otherwise CPU)</option>
-          <option value="gpu">GPU only</option><option value="cpu">CPU only</option>
-        </select></label>
-      <label>Memory limit for the local model
-        <select id="set-budget"><option value="2048">2 GB</option><option value="2560">2.5 GB</option></select></label>
-      <label class="check"><input id="set-cursor" type="checkbox"> Show the agent's cursor and typing</label>
-      <label class="check"><input id="set-confirm" type="checkbox"> Ask before buying, sending or deleting</label>
-      <label class="check"><input id="set-autostart" type="checkbox"> Start the agent when the browser opens</label>
-      <div class="row model-row"><span id="model-line" class="detail"></span>
-        <button id="model-download" class="ghost" hidden>Download model</button></div>
-      <p class="hint">Mode and memory changes apply the next time Jev Browser starts.</p>
-      <h2>Sites</h2>
-      <ul id="site-list" class="list compact"></ul>
-      <h2>Privacy</h2>
-      <div class="row"><button id="settings-clear-history" class="ghost">Clear browsing history</button>
-        <span class="detail">Private tabs never save history and forget cookies when the last one closes.</span></div>
-      <footer><button class="primary" data-close>Done</button></footer>
+      <header><h1>Profiles</h1><button class="icon-btn" data-icon="close" data-close aria-label="Close"></button></header>
+      <p class="hint">Each profile has its own window, Google account, cookies, history, bookmarks, settings and agent chats.</p>
+      <ul id="profile-list" class="profile-cards"></ul>
+      <form id="profile-form" class="row add-profile">
+        <input id="profile-color" type="color" value="#6b4fbb" aria-label="Color">
+        <input id="profile-name" class="grow" placeholder="Name a new profile" maxlength="40" required>
+        <button class="btn primary" type="submit" data-icon="plus" data-icon-size="15">Add</button>
+      </form>
+    </div>
+  </section>
+
+  <section id="permission" class="overlay" hidden>
+    <div class="sheet narrow">
+      <div class="perm-icon" data-icon="shield" data-icon-size="22"></div>
+      <h1 id="permission-title"></h1>
+      <p id="permission-text" class="hint"></p>
+      <label class="check"><input id="permission-remember" type="checkbox" checked> Remember for this site</label>
+      <footer><button id="permission-block" class="btn">Block</button><button id="permission-allow" class="btn primary">Allow</button></footer>
+    </div>
+  </section>
+
+  <section id="settings" class="overlay full" hidden>
+    <div class="settings">
+      <nav id="settings-nav">
+        <h1>Settings</h1>
+        <label class="searchbox"><span data-icon="search" data-icon-size="14"></span><input id="settings-search" type="search" placeholder="Search settings"></label>
+        <button data-section="you" class="on" data-icon="users" data-icon-size="17">You and Google</button>
+        <button data-section="agent" data-icon="sparkles" data-icon-size="17">Agent</button>
+        <button data-section="model" data-icon="cpu" data-icon-size="17">Model</button>
+        <button data-section="appearance" data-icon="palette" data-icon-size="17">Appearance</button>
+        <button data-section="search" data-icon="search" data-icon-size="17">Search engine</button>
+        <button data-section="startup" data-icon="power" data-icon-size="17">On startup</button>
+        <button data-section="privacy" data-icon="shield" data-icon-size="17">Privacy and security</button>
+        <button data-section="sites" data-icon="lock" data-icon-size="17">Site settings</button>
+        <button data-section="downloads" data-icon="download" data-icon-size="17">Downloads</button>
+        <button data-section="languages" data-icon="languages" data-icon-size="17">Languages</button>
+        <button data-section="default" data-icon="monitor" data-icon-size="17">Default browser</button>
+        <button data-section="system" data-icon="sliders" data-icon-size="17">System</button>
+        <button data-section="reset" data-icon="reset" data-icon-size="17">Reset settings</button>
+        <button data-section="about" data-icon="info" data-icon-size="17">About Jev Browser</button>
+        <button class="close-settings" data-close data-icon="close" data-icon-size="15">Close</button>
+      </nav>
+      <div id="settings-body">
+        <section data-section="you">
+          <h2>You and Google</h2>
+          <div class="card account">
+            <span id="you-avatar" class="avatar big"></span>
+            <div class="grow"><b id="you-name"></b><input id="you-name-input" maxlength="40" hidden aria-label="Profile name">
+              <div id="you-email" class="detail"></div></div>
+            <button id="you-rename" class="btn">Rename</button>
+            <button id="you-google" class="btn primary" data-icon="user" data-icon-size="15">Sign in to Google</button>
+          </div>
+          <p class="hint">Signing in to Google here keeps you signed in to Gmail, YouTube, Drive and other Google sites in
+            this profile. Chrome Sync (syncing bookmarks and passwords through Google) is only available in Google Chrome.</p>
+          <div class="card"><div class="row"><div class="grow">Profiles<div class="detail">Add, open or remove profiles</div></div>
+            <button id="you-manage" class="btn" data-icon="users" data-icon-size="15">Manage</button></div></div>
+        </section>
+
+        <section data-section="agent" hidden>
+          <h2>Agent</h2>
+          <div class="card">
+            <label>Where the agent runs
+              <select data-app="agent.mode"><option value="local">On this computer (private, no account)</option>
+                <option value="hosted">Hosted Jev (TYPESAFE_API_KEY in .env)</option></select></label>
+            <label class="check"><input type="checkbox" data-app="agent.autostart"> Start the agent when Jev Browser opens</label>
+            <label class="check"><input type="checkbox" data-app="agent.showCursor"> Show the agent's cursor and typing</label>
+            <label class="check"><input type="checkbox" data-app="agent.confirmRisky"> Ask before buying, sending or deleting</label>
+          </div>
+          <div class="card">
+            <h3>Thinking</h3>
+            <label class="check"><input type="checkbox" data-app="agent.think"> Think before each step <span class="detail">slower; best with thinking models</span></label>
+            <label class="check"><input type="checkbox" data-app="agent.showThinking"> Show thinking in the chat</label>
+          </div>
+          <div class="card">
+            <h3>Sites the agent may use</h3>
+            <ul id="agent-sites" class="list compact"></ul>
+          </div>
+          <div class="card"><div class="row"><div class="grow">Agent chats<div class="detail">Saved in this profile</div></div>
+            <button id="clear-chats" class="btn" data-icon="trash" data-icon-size="15">Delete all</button></div></div>
+        </section>
+
+        <section data-section="model" hidden>
+          <h2>Model</h2>
+          <div class="card">
+            <div class="row"><div class="grow"><b>Setup</b><div id="setup-line" class="detail"></div></div>
+              <button id="setup-run" class="btn primary">Set up</button></div>
+            <div id="setup-box" hidden><div class="bar"><span id="setup-fill"></span></div><div id="setup-text" class="detail"></div></div>
+          </div>
+          <div class="card">
+            <h3>Local model</h3>
+            <ul id="model-list" class="models"></ul>
+            <div class="row"><button id="model-custom" class="btn" data-icon="folder" data-icon-size="15">Use a GGUF file</button>
+              <span id="model-custom-path" class="detail"></span></div>
+          </div>
+          <div class="card">
+            <label>Accelerator
+              <select data-app="agent.device"><option value="auto">Automatic (GPU when available, otherwise CPU)</option>
+                <option value="gpu">GPU only</option><option value="cpu">CPU only</option></select></label>
+            <label>Memory limit
+              <select data-app="agent.budgetMb" data-number><option value="2048">2 GB</option><option value="2560">2.5 GB</option></select></label>
+            <label>Context window
+              <select data-app="agent.ctxSize" data-number><option value="2048">2,048 tokens (least memory)</option>
+                <option value="4096">4,096 tokens (default)</option><option value="8192">8,192 tokens (long pages, more memory)</option></select></label>
+            <label>CPU threads
+              <select data-app="agent.threads" data-number><option value="0">Automatic</option><option value="2">2</option>
+                <option value="4">4</option><option value="6">6</option><option value="8">8</option><option value="12">12</option></select></label>
+            <div class="row"><span id="model-running" class="detail grow"></span>
+              <button id="model-restart" class="btn" data-icon="reload" data-icon-size="15">Apply and restart</button></div>
+          </div>
+        </section>
+
+        <section data-section="appearance" hidden>
+          <h2>Appearance</h2>
+          <div class="card">
+            <label>Theme <select data-profile="appearance.theme"><option value="system">Same as the system</option>
+              <option value="light">Light</option><option value="dark">Dark</option></select></label>
+            <label>Default page zoom <select data-profile="appearance.zoom" data-number>
+              <option value="0.75">75%</option><option value="0.9">90%</option><option value="1">100%</option>
+              <option value="1.1">110%</option><option value="1.25">125%</option><option value="1.5">150%</option></select></label>
+            <label class="check"><input type="checkbox" data-profile="appearance.showHomeButton"> Show the home button</label>
+          </div>
+        </section>
+
+        <section data-section="search" hidden>
+          <h2>Search engine</h2>
+          <div class="card"><label>Search engine used in the address bar
+            <select data-profile="searchEngine"><option value="duckduckgo">DuckDuckGo</option><option value="google">Google</option>
+              <option value="bing">Bing</option><option value="brave">Brave Search</option><option value="ecosia">Ecosia</option>
+              <option value="startpage">Startpage</option></select></label></div>
+        </section>
+
+        <section data-section="startup" hidden>
+          <h2>On startup</h2>
+          <div class="card">
+            <label class="check"><input type="radio" name="startup" value="newtab" data-profile="startup.mode"> Open the home page</label>
+            <label class="check"><input type="radio" name="startup" value="continue" data-profile="startup.mode"> Continue where you left off</label>
+            <label class="check"><input type="radio" name="startup" value="pages" data-profile="startup.mode"> Open specific pages</label>
+            <label>Pages (one per line) <textarea id="startup-pages" rows="3"></textarea></label>
+            <label>Home page <input type="url" data-profile="homepage"></label>
+          </div>
+        </section>
+
+        <section data-section="privacy" hidden>
+          <h2>Privacy and security</h2>
+          <div class="card">
+            <h3>Clear browsing data</h3>
+            <label class="check"><input type="checkbox" id="clear-history-box" checked> Browsing history</label>
+            <label class="check"><input type="checkbox" id="clear-cookies-box"> Cookies and site data (signs you out)</label>
+            <label class="check"><input type="checkbox" id="clear-cache-box" checked> Cached images and files</label>
+            <label class="check"><input type="checkbox" id="clear-chats-box"> Agent chats</label>
+            <div class="row"><button id="clear-data" class="btn" data-icon="trash" data-icon-size="15">Clear data</button><span id="clear-done" class="detail"></span></div>
+          </div>
+          <div class="card">
+            <label class="check"><input type="checkbox" data-profile="privacy.doNotTrack"> Send "Do Not Track" and Global Privacy Control</label>
+            <label class="check"><input type="checkbox" data-profile="privacy.blockThirdPartyCookies"> Block third-party cookies</label>
+            <label class="check"><input type="checkbox" data-profile="privacy.httpsOnly"> Always use secure connections (HTTPS)</label>
+            <label class="check"><input type="checkbox" data-profile="privacy.clearOnExit"> Clear cookies and history when this profile closes</label>
+          </div>
+        </section>
+
+        <section data-section="sites" hidden>
+          <h2>Site settings</h2>
+          <div class="card" id="permission-defaults"></div>
+          <div class="card"><h3>Sites with their own permissions</h3><ul id="site-permissions" class="list compact"></ul></div>
+        </section>
+
+        <section data-section="downloads" hidden>
+          <h2>Downloads</h2>
+          <div class="card">
+            <div class="row"><div class="grow">Location<div id="download-dir" class="detail"></div></div>
+              <button id="download-change" class="btn" data-icon="folder" data-icon-size="15">Change</button></div>
+            <label class="check"><input type="checkbox" data-profile="downloads.ask"> Ask where to save each file</label>
+          </div>
+        </section>
+
+        <section data-section="languages" hidden>
+          <h2>Languages</h2>
+          <div class="card">
+            <label class="check"><input type="checkbox" data-profile="languages.spellcheck"> Check spelling when typing</label>
+            <label>Spell-check language <select id="spell-language">
+              <option value="en-US">English (US)</option><option value="en-GB">English (UK)</option><option value="hi">Hindi</option>
+              <option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option>
+              <option value="pt-BR">Portuguese (Brazil)</option><option value="it">Italian</option><option value="nl">Dutch</option></select></label>
+          </div>
+        </section>
+
+        <section data-section="default" hidden>
+          <h2>Default browser</h2>
+          <div class="card"><div class="row"><div class="grow" id="default-line"></div>
+            <button id="make-default" class="btn primary">Make default</button></div></div>
+        </section>
+
+        <section data-section="system" hidden>
+          <h2>System</h2>
+          <div class="card">
+            <label class="check"><input type="checkbox" data-app="system.hardwareAcceleration"> Use graphics acceleration when available</label>
+            <div class="row"><span class="detail grow">Takes effect after a restart.</span><button id="relaunch" class="btn" data-icon="reload" data-icon-size="15">Restart</button></div>
+          </div>
+        </section>
+
+        <section data-section="reset" hidden>
+          <h2>Reset settings</h2>
+          <div class="card"><div class="row"><div class="grow">Restore this profile's settings to their defaults
+            <div class="detail">Bookmarks, history, chats and your Google sign-in are kept.</div></div>
+            <button id="reset-profile" class="btn" data-icon="reset" data-icon-size="15">Reset</button></div></div>
+        </section>
+
+        <section data-section="about" hidden>
+          <h2>About Jev Browser</h2>
+          <div class="card">
+            <div class="row"><span class="app-mark" data-icon="sparkles" data-icon-size="22"></span>
+              <div class="grow"><b>Jev Browser</b><div id="about-version" class="detail"></div></div></div>
+            <div class="row"><div class="grow" id="update-line">Checking…</div>
+              <button id="update-action" class="btn primary" data-icon="update" data-icon-size="15">Check for updates</button></div>
+            <div id="update-box" hidden><div class="bar"><span id="update-fill"></span></div></div>
+            <label class="check"><input type="checkbox" data-app="update.autoCheck"> Check for updates automatically</label>
+            <div id="about-data" class="detail"></div>
+          </div>
+        </section>
+      </div>
     </div>
   </section>
 
@@ -109,11 +307,11 @@
     <div class="sheet welcome">
       <ol class="dots" aria-hidden="true"><li></li><li></li><li></li><li></li></ol>
       <div class="step" data-step="1">
-        <div class="hero">⚡</div>
+        <div class="hero" data-icon="sparkles" data-icon-size="34"></div>
         <h1>Welcome to Jev Browser</h1>
         <p>A browser with an agent built in. Tell it what you want on a page, and it clicks, types and chooses for
           you while you watch.</p>
-        <footer><button class="primary" data-next>Get started</button></footer>
+        <footer><button class="btn primary" data-next>Get started</button></footer>
       </div>
       <div class="step" data-step="2" hidden>
         <h1>Where should the agent run?</h1>
@@ -121,32 +319,32 @@
           <span><b>On this computer</b> · free, private, no account. Uses about 1.4 GB of memory (limit 2 GB).</span></label>
         <label class="choice"><input type="radio" name="mode" value="hosted">
           <span><b>Hosted Jev</b> · faster and more accurate. Needs a TypeSafe API key in <code>.env</code>.</span></label>
-        <footer><button data-back>Back</button><button class="primary" data-next>Continue</button></footer>
+        <footer><button class="btn" data-back>Back</button><button class="btn primary" data-next>Continue</button></footer>
       </div>
       <div class="step" data-step="3" hidden>
-        <h1>Checking this computer</h1>
+        <h1>Setting up this computer</h1>
         <ul id="check-list" class="checks"></ul>
-        <div id="download-box" hidden>
-          <div class="bar"><span id="download-fill"></span></div>
-          <div class="row"><span id="download-text" class="detail"></span>
-            <button id="download-start" class="primary">Download model (1.1 GB)</button>
-            <button id="download-cancel" class="ghost" hidden>Cancel</button></div>
+        <div id="onboard-setup" hidden>
+          <div class="bar"><span id="onboard-fill"></span></div>
+          <div class="row"><span id="onboard-text" class="detail grow"></span>
+            <button id="onboard-run" class="btn primary" data-icon="download" data-icon-size="15">Set up automatically</button></div>
         </div>
-        <footer><button data-back>Back</button><button id="check-next" class="primary" data-next disabled>Continue</button></footer>
+        <footer><button class="btn" data-back>Back</button><button id="check-next" class="btn primary" data-next disabled>Continue</button></footer>
       </div>
       <div class="step" data-step="4" hidden>
         <h1>What the agent can do</h1>
         <ul class="rules">
           <li>It acts only on the tab you are viewing, only with clicks, typing, choices and scrolling.</li>
           <li>It asks before using a site for the first time, and before anything that buys, sends or deletes.</li>
-          <li>It uses your logged-in sessions on that tab. Watch it, and press <b>Stop</b> whenever you want.</li>
+          <li>It uses your logged-in sessions on that tab. Watch it, and press stop whenever you want.</li>
           <li>It never sees your other tabs, saved passwords or files.</li>
           <li>"Done" is its own claim. Always check the result.</li>
         </ul>
-        <footer><button data-back>Back</button><button class="primary" data-finish>Try it on a practice shop</button></footer>
+        <footer><button class="btn" data-back>Back</button><button class="btn primary" data-finish>Try it on a practice shop</button></footer>
       </div>
     </div>
   </section>
+  <script src="icons.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

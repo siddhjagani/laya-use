@@ -67,9 +67,14 @@ def emit(kind, text, **extra):
 def run(goal, url):
     emit("status", "Working on your current tab…")
     seen = 0
+    thoughts = 0
     try:
         with Agent(url, goal, attach=True, confirm=confirm) as agent:
             for state in agent.run():
+                for decision in state["decisions"][thoughts:]:
+                    if decision.get("thinking"):
+                        emit("thinking", decision["thinking"])
+                thoughts = len(state["decisions"])
                 for step in state["history"][seen:]:
                     emit("step", describe(step), ms=step.get("elapsed_ms"))
                 seen = len(state["history"])
